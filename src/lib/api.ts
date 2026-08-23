@@ -510,7 +510,7 @@ export function describePriceWindow(iso: string | undefined): string | null {
  */
 export function paymentWindowCopy(hours: number | null | undefined): string {
 	if (hours == null || !(hours > 0)) {
-		return "Pay before the deadline shown on your invoice — after that, you reorder at the current price.";
+		return "Pay to confirm this order at the price shown — after that, you reorder at the current price.";
 	}
 	const unit = hours === 1 ? "hour" : "hours";
 	return `Your price stays valid for ${hours} ${unit} from the time you order. Pay on the next step or from your dashboard — after that, you reorder at the current price.`;
