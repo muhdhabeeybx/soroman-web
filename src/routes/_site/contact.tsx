@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import {
 	DEPOT_LOCATIONS,
 	LOADING_HOURS,
+	mapsHref,
+	OFFICE_ADDRESS,
 	SUPPORT_EMAIL,
 	SUPPORT_PHONE,
 	telHref,
@@ -88,6 +90,21 @@ function ContactPage() {
 							className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline"
 						>
 							{SUPPORT_EMAIL}
+						</a>
+					</div>
+
+					<div className="mt-12 border-t border-foreground pt-8">
+						<h2 className="text-2xl">Visit us</h2>
+						<address className="mt-2 text-sm leading-relaxed text-muted-foreground not-italic">
+							{OFFICE_ADDRESS}
+						</address>
+						<a
+							href={mapsHref(OFFICE_ADDRESS)}
+							target="_blank"
+							rel="noreferrer"
+							className="mt-4 inline-block text-sm text-accent underline-offset-4 hover:underline"
+						>
+							Get directions
 						</a>
 					</div>
 				</div>
