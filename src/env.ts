@@ -27,6 +27,7 @@ export const env = createEnv({
 		VITE_WHATSAPP_URL: z.url().optional(),
 		VITE_APP_STORE_URL: z.url().optional(),
 		VITE_PLAY_STORE_URL: z.url().optional(),
+		VITE_OFFICE_ADDRESS: z.string().min(5).optional(),
 	},
 	runtimeEnv: viteEnv,
 	skipValidation: !!viteEnv.SKIP_ENV_VALIDATION,

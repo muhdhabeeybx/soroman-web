@@ -29,6 +29,15 @@ export const PLAY_STORE_URL =
 
 export const COMPANY_NAME = "Soroman Energy";
 
+/** The head-office / main-depot street address shown on the contact page. */
+export const OFFICE_ADDRESS =
+	env.VITE_OFFICE_ADDRESS ??
+	"Soroman Depot, Portside Industrial Area, Esuk Utan, Calabar, Cross River State";
+
+/** A Google Maps directions link for any address string. */
+export const mapsHref = (address: string) =>
+	`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+
 export const telHref = (phone: string) => `tel:${phone.replace(/\s/g, "")}`;
 
 export const DEPOT_LOCATIONS = [
