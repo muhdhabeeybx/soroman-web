@@ -510,7 +510,7 @@ export function describePriceWindow(iso: string | undefined): string | null {
  */
 export function paymentWindowCopy(hours: number | null | undefined): string {
 	if (hours == null || !(hours > 0)) {
-		return "Pay before the deadline shown on your invoice — after that, you reorder at the current price.";
+		return "Pay to confirm this order at the price shown — after that, you reorder at the current price.";
 	}
 	const unit = hours === 1 ? "hour" : "hours";
 	return `Your price stays valid for ${hours} ${unit} from the time you order. Pay on the next step or from your dashboard — after that, you reorder at the current price.`;
@@ -702,8 +702,12 @@ const CATALOG_TTL_MS = 30_000;
 
 type CatalogPayload = {
 	depots: ServerCatalogDepot[];
-	/** From ORDER_EXPIRY_HOURS; defaults to 24 if an older API omits it. */
-	orderExpiryHours: number;
+	/**
+	 * From ORDER_EXPIRY_HOURS. `null` means expiry is switched off
+	 * (ORDER_EXPIRY_DISABLED) — the copy drops the deadline promise. An older
+	 * API that omits the field entirely defaults to 24.
+	 */
+	orderExpiryHours: number | null;
 };
 
 function fetchCatalogPayload(): Promise<CatalogPayload> {
@@ -712,13 +716,19 @@ function fetchCatalogPayload(): Promise<CatalogPayload> {
 	}
 	const promise = request<{
 		depots: ServerCatalogDepot[];
-		orderExpiryHours?: number;
+		orderExpiryHours?: number | null;
 	}>("/api/catalog").then((data) => {
-		const hours = Number(data.orderExpiryHours);
-		return {
-			depots: data.depots,
-			orderExpiryHours: Number.isFinite(hours) && hours > 0 ? hours : 24,
-		};
+		// Explicit null = expiry switched off server-side; pass it through so the
+		// copy goes neutral. A genuinely ABSENT field (older API) still defaults
+		// to 24; only a present-but-null value means "no window".
+		let orderExpiryHours: number | null;
+		if (data.orderExpiryHours === null) {
+			orderExpiryHours = null;
+		} else {
+			const hours = Number(data.orderExpiryHours);
+			orderExpiryHours = Number.isFinite(hours) && hours > 0 ? hours : 24;
+		}
+		return { depots: data.depots, orderExpiryHours };
 	});
 	catalogCache = { at: Date.now(), promise };
 	promise.catch(() => {
@@ -1058,7 +1068,7 @@ export const api = {
 		},
 
 		/** Payment window in hours — same value the expiry sweep uses. */
-		orderExpiryHours: async (): Promise<number> => {
+		orderExpiryHours: async (): Promise<number | null> => {
 			const payload = await fetchCatalogPayload();
 			return payload.orderExpiryHours;
 		},
