@@ -7,9 +7,7 @@ import LoadingStep from "@/components/order/loading-step";
 import NextSteps from "@/components/order/next-steps";
 import OrderStep from "@/components/order/order-step";
 import ReviewStep from "@/components/order/review-step";
-import VerifyStep, {
-	type DepotAccountPhase,
-} from "@/components/order/verify-step";
+import VerifyStep, { type GuestDetails } from "@/components/order/verify-step";
 import {
 	WizardActions,
 	WizardBack,
@@ -58,7 +56,7 @@ const searchSchema = z.object({
 const DEPOT_STEPS: readonly WizardStep<StepKey>[] = [
 	{ key: "order", label: "Order", icon: Fuel },
 	{ key: "loading", label: "Loading", icon: Truck },
-	{ key: "verify", label: "Your account", icon: UserRound },
+	{ key: "verify", label: "Your details", icon: UserRound },
 	{ key: "review", label: "Review", icon: ListChecks },
 	{ key: "payment", label: "Payment", icon: CreditCard },
 ];
@@ -75,8 +73,9 @@ const STEP_COPY: Partial<
 		description: "Load with your trucks, or load with Soroman Trucks.",
 	},
 	verify: {
-		title: "Your account",
-		description: "A phone number saves this order so you can pay and track it.",
+		title: "Your details",
+		description:
+			"Just your name and phone number — the order is saved against the number, no code needed.",
 	},
 	review: {
 		title: "Review & order",
@@ -177,8 +176,7 @@ function OrderPage() {
 		() => readOrderDraft()?.companyName ?? "",
 	);
 	const [order, setOrder] = useState<PlacedOrder | null>(null);
-	const [accountPhase, setAccountPhase] = useState<DepotAccountPhase>("fields");
-	const [accountBusy, setAccountBusy] = useState(false);
+	const [guest, setGuest] = useState<GuestDetails | null>(null);
 	const [accountError, setAccountError] = useState<string | null>(null);
 	const accountContinueRef = useRef<(() => Promise<void>) | null>(null);
 	const [placeBusy, setPlaceBusy] = useState(false);
@@ -273,6 +271,9 @@ function OrderPage() {
 			loading,
 			trucks,
 			companyName,
+			// Guest checkout: no session, the phone identifies the order. The
+			// details were collected on the verify step; signed-in buyers skip it.
+			guest: !isAuthed && guest ? guest : undefined,
 		});
 		clearOrderDraft();
 		setOrder(placed);
@@ -308,7 +309,6 @@ function OrderPage() {
 	};
 
 	const goAfterLoading = () => {
-		setAccountPhase("fields");
 		setAccountError(null);
 		setPlaceError(null);
 		setStep(isAuthed ? "review" : "verify");
@@ -337,9 +337,7 @@ function OrderPage() {
 					}
 				: step === "verify" && !isAuthed
 					? {
-							label:
-								accountPhase === "code" ? "Verify & continue" : "Send code",
-							busy: accountBusy,
+							label: "Continue",
 							onClick: () => void accountContinueRef.current?.(),
 						}
 					: step === "review"
@@ -382,26 +380,13 @@ function OrderPage() {
 		);
 	}
 
-	const copy =
-		step === "verify" && accountPhase === "code"
-			? {
-					title: "Your account",
-					description: "Enter the code we texted you to continue.",
-				}
-			: STEP_COPY[step];
+	const copy = STEP_COPY[step];
 
 	const onStepBack =
 		step === "loading"
 			? () => setStep("order")
 			: step === "verify"
-				? () => {
-						if (accountPhase === "code") {
-							setAccountPhase("fields");
-							setAccountError(null);
-							return;
-						}
-						setStep("loading");
-					}
+				? () => setStep("loading")
 				: step === "review"
 					? () => setStep(isAuthed ? "loading" : "verify")
 					: undefined;
@@ -418,7 +403,7 @@ function OrderPage() {
 		return true;
 	});
 
-	const wizardBusy = accountBusy || placeBusy;
+	const wizardBusy = placeBusy;
 
 	return (
 		<div className="relative mx-auto flex w-full max-w-4xl flex-col px-4 py-6 sm:px-6 md:py-10">
@@ -493,12 +478,13 @@ function OrderPage() {
 							)}
 							{step === "verify" && (
 								<VerifyStep
-									phase={accountPhase}
-									onPhaseChange={setAccountPhase}
-									busy={accountBusy}
-									onBusy={setAccountBusy}
 									error={accountError}
 									onError={setAccountError}
+									onReady={(details) => {
+										setGuest(details);
+										setAccountError(null);
+										setStep("review");
+									}}
 									onVerified={() => {
 										setAccountError(null);
 										setStep("review");

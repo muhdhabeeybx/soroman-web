@@ -675,8 +675,12 @@ function mapTracked(t: ServerTracked): TrackedOrder {
  */
 let lastPlacement: {
 	orderIds: number[];
+	/** Order references (order numbers) — the public-tracking key. */
+	refs: string[];
 	payment: ServerPayment;
 	paidFromWallet: boolean;
+	/** Placed without a session — progress must be watched via public tracking. */
+	guest: boolean;
 } | null = null;
 
 // ── Catalog cache ────────────────────────────────────────────────────────────
@@ -1091,11 +1095,20 @@ export const api = {
 			/** The company this order is placed for — may differ from the buyer's
 			 * own profile company. Optional; the backend stores "" when omitted. */
 			companyName?: string;
+			/**
+			 * Guest checkout: place without a session. The phone identifies the
+			 * order (find-or-create on the backend, same as registering later) and
+			 * no account access is granted — history and wallet stay behind OTP.
+			 */
+			guest?: { name: string; phone: string; email?: string };
 		}): Promise<PlacedOrder> => {
 			if (input.lines.length === 0)
 				throw new ApiError(400, "Nothing to order.");
 
 			const companyName = input.companyName?.trim();
+			const endpoint = input.guest
+				? "/api/customer/orders/guest"
+				: "/api/customer/orders";
 			const placed: { order: ServerOrder; payment: ServerPayment }[] = [];
 			for (const line of input.lines) {
 				const body: Record<string, unknown> = {
@@ -1109,6 +1122,11 @@ export const api = {
 					deliveryType: input.loading.type,
 				};
 				if (companyName) body.companyName = companyName;
+				if (input.guest) {
+					body.name = input.guest.name.trim();
+					body.phone = normalizePhone(input.guest.phone) ?? input.guest.phone;
+					if (input.guest.email?.trim()) body.email = input.guest.email.trim();
+				}
 				if (input.loading.type === "delivery") {
 					// The field the UI has always collected but never sent — the truck's
 					// destination. Empty on pickup, where the depot is the address.
@@ -1128,14 +1146,16 @@ export const api = {
 				const data = await request<{
 					order: ServerOrder;
 					payment: ServerPayment;
-				}>("/api/customer/orders", { method: "POST", body });
+				}>(endpoint, { method: "POST", body });
 				placed.push(data);
 			}
 
 			lastPlacement = {
 				orderIds: placed.map((p) => p.order.id),
+				refs: placed.map((p) => p.order.orderNumber),
 				payment: placed[0].payment,
 				paidFromWallet: placed.every((p) => p.order.paymentStatus === "Paid"),
+				guest: Boolean(input.guest),
 			};
 
 			const total = placed.reduce(
@@ -1407,27 +1427,53 @@ export const api = {
 			}
 
 			const seen = new Set<number>();
-			const poll = async () => {
-				for (const orderId of placement.orderIds) {
-					if (seen.has(orderId)) continue;
-					try {
-						const data = await request<{ order: ServerOrder }>(
-							`/api/customer/orders/${orderId}`,
-						);
-						if (data.order.paymentStatus === "Paid") {
-							seen.add(orderId);
-							onCredit({
-								id: orderId,
-								from: `Transfer confirmed · ${data.order.orderNumber}`,
-								amount: Number(data.order.totalAmount || 0),
-							});
+			// A guest has no session, so the authed order endpoint would 401 on
+			// every tick. Public tracking answers by reference instead: an order
+			// whose timeline has reached payment_confirmed has been paid. Amounts
+			// aren't public, so the guest credit carries the invoice total (guests
+			// place a single order — the wizard is one product per order).
+			const poll = placement.guest
+				? async () => {
+						for (const [i, ref] of placement.refs.entries()) {
+							const orderId = placement.orderIds[i];
+							if (seen.has(orderId)) continue;
+							try {
+								const tracked = await api.tracking.lookup(ref);
+								if (tracked?.reached.payment_confirmed) {
+									seen.add(orderId);
+									onCredit({
+										id: orderId,
+										from: `Transfer confirmed · ${ref}`,
+										amount: total,
+									});
+								}
+							} catch {
+								// Transient — next tick tries again.
+							}
 						}
-					} catch {
-						// Transient — next tick tries again.
+						if (seen.size === placement.orderIds.length) stop();
 					}
-				}
-				if (seen.size === placement.orderIds.length) stop();
-			};
+				: async () => {
+						for (const orderId of placement.orderIds) {
+							if (seen.has(orderId)) continue;
+							try {
+								const data = await request<{ order: ServerOrder }>(
+									`/api/customer/orders/${orderId}`,
+								);
+								if (data.order.paymentStatus === "Paid") {
+									seen.add(orderId);
+									onCredit({
+										id: orderId,
+										from: `Transfer confirmed · ${data.order.orderNumber}`,
+										amount: Number(data.order.totalAmount || 0),
+									});
+								}
+							} catch {
+								// Transient — next tick tries again.
+							}
+						}
+						if (seen.size === placement.orderIds.length) stop();
+					};
 
 			const interval = setInterval(() => void poll(), 8000);
 			const stop = () => clearInterval(interval);
