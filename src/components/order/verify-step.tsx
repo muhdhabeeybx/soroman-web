@@ -1,72 +1,58 @@
 import { useForm } from "@tanstack/react-form";
-import { useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { z } from "zod";
-import { DevCodeHint } from "@/components/auth/dev-code-hint";
-import OtpInput from "@/components/auth/otp-input";
 import { FieldError, showFieldError } from "@/components/field-error";
 import { BoxedInput } from "@/components/order/boxed";
 import PhoneField from "@/components/phone-field";
 import { Label } from "@/components/ui/label";
+import { normalizePhone } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 import {
-	ApiError,
-	api,
-	formatPhoneForDisplay,
-	normalizePhone,
-} from "@/lib/api";
-import { authStore, useAuth } from "@/lib/auth";
-import { deviceName } from "@/lib/device";
-import { emailSchema, phoneSchema, requiredTrimmed } from "@/lib/validation";
+	optionalEmailSchema,
+	phoneSchema,
+	requiredTrimmed,
+} from "@/lib/validation";
 
 const FIELD_LABEL =
 	"text-[0.65rem] tracking-[0.18em] text-muted-foreground uppercase";
 
-const RESEND_COOLDOWN_SECONDS = 60;
-const OTP_LENGTH = 6;
-
-const accountSchema = z.object({
+const detailsSchema = z.object({
 	name: requiredTrimmed("Your name is required."),
 	phone: phoneSchema,
-	email: emailSchema,
+	email: optionalEmailSchema,
 });
 
-export type DepotAccountPhase = "fields" | "code";
+/** The guest's identity, ready to ride along with the order placement. */
+export type GuestDetails = { name: string; phone: string; email?: string };
 
 type VerifyStepProps = {
-	phase: DepotAccountPhase;
-	onPhaseChange: (phase: DepotAccountPhase) => void;
-	busy: boolean;
-	onBusy: (busy: boolean) => void;
 	error: string | null;
 	onError: (message: string | null) => void;
-	/** Advances to review after a successful OTP (or when already signed in). */
+	/**
+	 * Fires with validated details; the parent stores them and advances to
+	 * review. No OTP here — the order is placed as a guest, and the phone is
+	 * only ever proven later, when (if) they sign in to see their history.
+	 */
+	onReady: (guest: GuestDetails) => void;
+	/** Advances past this step when a session already exists (or appears). */
 	onVerified: () => void;
 	continueHandlerRef: { current: (() => Promise<void>) | null };
 };
 
 /**
- * Account gate after Loading — name, phone, required email, then OTP.
- * Signed-in buyers are advanced by the parent (this step is skipped). Email
- * is profile-only; phone creates / signs in. Placement happens on Review.
+ * Guest details after Loading — name, phone, optional email. No verification
+ * code: placing an unpaid order doesn't warrant one, and the OTP stays where
+ * the stakes are (seeing history, spending a wallet). Signed-in buyers are
+ * advanced by the parent; this step is skipped for them.
  */
 export default function VerifyStep({
-	phase,
-	onPhaseChange,
-	busy,
-	onBusy,
 	error,
 	onError,
+	onReady,
 	onVerified,
 	continueHandlerRef,
 }: VerifyStepProps) {
 	const auth = useAuth();
-	const [code, setCode] = useState("");
-	const [resendIn, setResendIn] = useState(0);
-	const [remember, setRemember] = useState(true);
-	const [devCode, setDevCode] = useState<string | null>(null);
-	const [sentPhone, setSentPhone] = useState<string | null>(null);
-	// Sync lock — parent `busy` state alone can't stop autofill + Continue
-	// from firing two verifies before the first re-render disables the form.
-	const verifyInFlight = useRef(false);
 
 	const form = useForm({
 		defaultValues: {
@@ -74,14 +60,8 @@ export default function VerifyStep({
 			phone: auth.status === "authed" ? auth.customer.phone || "" : "",
 			email: auth.status === "authed" ? auth.customer.email?.trim() || "" : "",
 		},
-		validators: { onChange: accountSchema },
+		validators: { onChange: detailsSchema },
 	});
-
-	useEffect(() => {
-		if (resendIn <= 0) return;
-		const id = window.setInterval(() => setResendIn((s) => s - 1), 1000);
-		return () => window.clearInterval(id);
-	}, [resendIn > 0]);
 
 	// Mid-wizard sign-in (e.g. another tab) — advance to review.
 	useEffect(() => {
@@ -89,163 +69,28 @@ export default function VerifyStep({
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [auth.status]);
 
-	const sendCode = async () => {
-		const parsed = accountSchema.safeParse(form.state.values);
+	continueHandlerRef.current = async () => {
+		const parsed = detailsSchema.safeParse(form.state.values);
 		if (!parsed.success) {
 			onError(
 				parsed.error.issues[0]?.message ??
-					"Add your name, phone number, and email to continue.",
+					"Add your name and phone number to continue.",
 			);
 			return;
 		}
-		const phone = normalizePhone(parsed.data.phone)!;
-		onBusy(true);
 		onError(null);
-		try {
-			const { devCode: hint } = await api.auth.register({
-				phone,
-				name: parsed.data.name.trim(),
-			});
-			setDevCode(hint ?? null);
-			setSentPhone(phone);
-			setCode("");
-			setResendIn(RESEND_COOLDOWN_SECONDS);
-			onPhaseChange("code");
-		} catch (err) {
-			onError(
-				err instanceof ApiError
-					? err.message
-					: "Could not send the code. Check your connection and try again.",
-			);
-		} finally {
-			onBusy(false);
-		}
+		onReady({
+			name: parsed.data.name.trim(),
+			phone: normalizePhone(parsed.data.phone) ?? parsed.data.phone,
+			email: parsed.data.email.trim() || undefined,
+		});
 	};
-
-	const verifyCode = async (otp: string = code) => {
-		if (!sentPhone || otp.length < OTP_LENGTH) {
-			onError("Enter the 6-digit code we texted you.");
-			return;
-		}
-		if (verifyInFlight.current) return;
-		verifyInFlight.current = true;
-		onBusy(true);
-		onError(null);
-		try {
-			const session = await api.auth.verifyOtp(sentPhone, otp, {
-				trustDevice: remember,
-				deviceName: deviceName(),
-			});
-			let customer = session.customer;
-			authStore.signedIn(customer);
-
-			const name = form.state.values.name.trim();
-			const email = form.state.values.email.trim();
-			const patch: { name?: string; email?: string } = {};
-			if (name && name !== customer.name) patch.name = name;
-			if (email && email !== (customer.email ?? "")) patch.email = email;
-			if (Object.keys(patch).length > 0) {
-				try {
-					customer = await api.me.update(patch);
-					authStore.signedIn(customer);
-				} catch {
-					// Signed in; profile polish can wait.
-				}
-			}
-			onVerified();
-		} catch (err) {
-			setCode("");
-			onError(
-				err instanceof ApiError
-					? err.message
-					: "That code didn't work. Try again.",
-			);
-		} finally {
-			verifyInFlight.current = false;
-			onBusy(false);
-		}
-	};
-
-	continueHandlerRef.current =
-		phase === "code" ? () => verifyCode() : () => sendCode();
-
-	if (phase === "code") {
-		return (
-			<section className="grid gap-5">
-				<div>
-					<p className="text-sm font-medium tracking-tight">
-						Confirm it&apos;s you
-					</p>
-					<p className="mt-2 text-sm text-muted-foreground">
-						Sent to{" "}
-						<span className="font-medium text-foreground">
-							{sentPhone ? formatPhoneForDisplay(sentPhone) : "your phone"}
-						</span>{" "}
-						·{" "}
-						<button
-							type="button"
-							className="cursor-pointer underline underline-offset-4 hover:text-foreground"
-							disabled={busy}
-							onClick={() => {
-								onPhaseChange("fields");
-								onError(null);
-								setCode("");
-							}}
-						>
-							Change
-						</button>
-					</p>
-				</div>
-				<OtpInput
-					value={code}
-					onChange={(next) => {
-						setCode(next);
-						onError(null);
-						if (next.length === OTP_LENGTH) void verifyCode(next);
-					}}
-					length={OTP_LENGTH}
-					disabled={busy}
-					label="6-digit verification code"
-				/>
-				<DevCodeHint code={devCode} />
-				<label className="flex items-center gap-2.5 text-sm text-muted-foreground">
-					<input
-						type="checkbox"
-						checked={remember}
-						onChange={(e) => setRemember(e.target.checked)}
-						className="size-4 accent-accent"
-					/>
-					Remember this device — use a PIN next time, no code
-				</label>
-				{error && (
-					<p role="alert" className="text-xs text-destructive">
-						{error}
-					</p>
-				)}
-				<p className="text-xs text-muted-foreground">
-					The code expires in 10 minutes.{" "}
-					{resendIn > 0 ? (
-						<>You can resend in {resendIn}s.</>
-					) : (
-						<button
-							type="button"
-							className="cursor-pointer underline underline-offset-4 hover:text-foreground disabled:opacity-50"
-							disabled={busy}
-							onClick={() => void sendCode()}
-						>
-							Resend code
-						</button>
-					)}
-				</p>
-			</section>
-		);
-	}
 
 	return (
 		<section>
 			<p className="mb-5 text-sm text-muted-foreground">
-				Save this order to your account so you can pay and track it. No
-				password.
+				Your phone number is all the order needs — no code, no password. Sign in
+				with it any time to see your orders.
 			</p>
 			<div className="grid gap-5">
 				<form.Field name="name">
@@ -294,8 +139,8 @@ export default function VerifyStep({
 								id="depot-account-phone-error"
 							/>
 							<p className="text-xs text-muted-foreground">
-								We&apos;ll text a one-time code — your account is created if
-								you&apos;re new.
+								The order is saved against this number — it identifies you at
+								the depot and on WhatsApp.
 							</p>
 						</div>
 					)}
@@ -305,7 +150,7 @@ export default function VerifyStep({
 					{(field) => (
 						<div className="grid gap-1.5">
 							<Label htmlFor="depot-account-email" className={FIELD_LABEL}>
-								Email
+								Email <span className="normal-case">(optional)</span>
 							</Label>
 							<BoxedInput
 								id="depot-account-email"
@@ -324,7 +169,7 @@ export default function VerifyStep({
 								id="depot-account-email-error"
 							/>
 							<p className="text-xs text-muted-foreground">
-								Used for receipts and updates — and to sign in with your PIN.
+								Used for your invoice and order updates.
 							</p>
 						</div>
 					)}
