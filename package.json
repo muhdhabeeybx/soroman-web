@@ -8,8 +8,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "generate-routes": "tsr generate",
-    "build": "vite build && bun scripts/prerender.ts",
-    "prerender": "bun scripts/prerender.ts",
+    "build": "vite build",
     "preview": "vite preview",
     "start": "serve -s dist -l tcp://0.0.0.0:${PORT:-3000}",
     "check-types": "vite build && tsc --noEmit",
@@ -57,7 +56,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
-    "playwright": "^1.62.1",
     "typescript": "^6.0.2",
     "vite": "^8.0.0"
   },
