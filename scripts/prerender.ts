@@ -3,6 +3,20 @@ import path from "node:path";
 import { chromium } from "playwright";
 import { preview } from "vite";
 
+/*
+ * Writes a real HTML file per public route so crawlers that never run
+ * JavaScript — Bing, and every social scraper including WhatsApp — get markup
+ * instead of an empty #app div.
+ *
+ * The output only reaches anyone if the production server prefers a matching
+ * file over the SPA fallback, which is why `start` runs `sirv --single` and
+ * NOT `serve -s`. serve applies its rewrites before touching the filesystem
+ * and re-applies them recursively, so a `** -> /index.html` catch-all rewrites
+ * /faq/index.html straight back to the homepage: every prerendered page is
+ * served as / and the build silently produces duplicate content across five
+ * URLs. sirv checks the filesystem first and falls back only on a miss.
+ */
+
 // Public marketing routes under `_site`. Dashboard, auth, order wizards, and
 // `/t/$ref` are left as the SPA shell (not worth static snapshots).
 const PUBLIC_ROUTES = ["/", "/faq", "/contact", "/terms", "/privacy"] as const;
