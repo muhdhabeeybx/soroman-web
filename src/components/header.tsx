@@ -129,17 +129,25 @@ export default function Header() {
 						className="flex shrink-0 items-center"
 					>
 						{/*
-						 * The official full logo. Its wordmark is near-black (#272827), so
-						 * on the charcoal dark ground it would sit at ~1.1:1 and vanish.
-						 * invert+hue-rotate flips lightness while keeping hue: the wordmark
-						 * lands at #d7d8d7 (12.2:1) and the mark stays green (#32a97a).
+						 * The full bilingual lockup, 索罗曼 included.
+						 *
+						 * Sized off the Chinese line rather than the wordmark: it occupies
+						 * the bottom 27% of the image, so the usual h-6 would set it at
+						 * ~6px and reduce it to green mush. h-10/h-12 puts it at 11-13px,
+						 * which reads. The bar is h-16/md:h-20, so that still leaves
+						 * 12-16px of breathing room above and below.
+						 *
+						 * The wordmark is near-black (#222323), so on the charcoal dark
+						 * ground it would sit at 1.08:1 and vanish. invert+hue-rotate flips
+						 * lightness while keeping hue: the wordmark lands at #dddcdc
+						 * (12.5:1) and both the mark and the Chinese stay green.
 						 */}
 						<img
-							src="/logo-full.png"
+							src="/logo-lockup.png"
 							alt=""
-							width={770}
-							height={136}
-							className="h-5 w-auto md:h-6 dark:hue-rotate-180 dark:invert"
+							width={1000}
+							height={250}
+							className="h-10 w-auto md:h-12 dark:hue-rotate-180 dark:invert"
 						/>
 					</Link>
 

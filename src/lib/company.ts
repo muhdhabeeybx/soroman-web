@@ -40,11 +40,23 @@ export const mapsHref = (address: string) =>
 
 export const telHref = (phone: string) => `tel:${phone.replace(/\s/g, "")}`;
 
+/**
+ * Where we load, grouped by state and alphabetical by state so the contact
+ * page reads as a geography rather than an arbitrary list. Keep new entries in
+ * their state's block.
+ *
+ * `state` carries no "State" suffix — the contact page renders `{state} State`,
+ * so adding it here prints it twice.
+ */
 export const DEPOT_LOCATIONS = [
-	{ name: "Apapa Depot", state: "Lagos" },
-	{ name: "Ijegun Depot", state: "Lagos" },
-	{ name: "Oghara Depot", state: "Delta" },
-	{ name: "Warri Depot", state: "Delta" },
-	{ name: "Port Harcourt Depot", state: "Rivers" },
-	{ name: "Calabar Depot", state: "Cross River" },
+	{ name: "Calabar Soroman Depot", state: "Cross River" },
+
+	{ name: "Keonamex Depot Warri", state: "Delta" },
+
+	{ name: "Dangote Refinery Soroman Ticket", state: "Lagos" },
+	{ name: "AIPEC Depot Lagos", state: "Lagos" },
+
+	{ name: "TSL Depot Port Harcourt", state: "Rivers" },
+	{ name: "Liquid Bulk Port Harcourt", state: "Rivers" },
+	{ name: "Avidor Depot Port Harcourt", state: "Rivers" },
 ] as const;
