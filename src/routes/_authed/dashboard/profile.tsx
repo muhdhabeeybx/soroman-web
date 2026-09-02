@@ -35,7 +35,7 @@ function ProfilePage() {
 					.
 				</h1>
 				<p className="mt-3 max-w-lg text-sm text-muted-foreground">
-					Details on invoices and waybills, plus your dedicated funding account.
+					Details on invoices and waybills, plus how order payments work.
 				</p>
 			</header>
 
