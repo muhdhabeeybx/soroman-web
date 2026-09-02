@@ -5,11 +5,10 @@ import { formatNaira } from "@/lib/use-catalog";
 import { cn } from "@/lib/utils";
 
 /**
- * Wallet balance — the signal the old dashboard never surfaced. Balance pays
- * an order instantly, so it leads; the coverage line turns an abstract naira
- * figure into litres ("how much fuel is this?"). Personal funding accounts
- * are gone (deposits are recorded by Soroman staff), so the footer points at
- * the wallet page for the how-to instead of showing an account number.
+ * Wallet balance — deposits Soroman has recorded for this customer. Orders
+ * are paid by bank transfer and confirmed by the desk (self-service wallet
+ * pay was withdrawn), so this reads as a statement of standing, not a spend
+ * button; the coverage line turns the naira figure into litres.
  */
 export default function WalletCard({
 	balance,
@@ -56,7 +55,7 @@ export default function WalletCard({
 					</p>
 					<p className="mt-2 text-xs text-muted-foreground">
 						{balance <= 0
-							? "Fund your wallet to pay orders instantly."
+							? "Deposits recorded by Soroman appear here."
 							: litres !== null
 								? `About ${litres.toLocaleString()} L at today's best price.`
 								: "Spendable on your next order."}

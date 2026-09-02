@@ -39,18 +39,12 @@ type PayDialogProps = {
 };
 
 /**
- * Pay modal for an unpaid depot order: transfer account always shown, plus
- * wallet pay when the balance covers it — or a clear shortfall when it doesn't.
+ * Pay modal for an unpaid depot order: the transfer account and the exact
+ * total. Wallet pay was withdrawn backend-wide — orders are confirmed by the
+ * finance desk against the bank transfer, never drawn from a balance.
  */
 export function DepotPayDialog({ order, open, onOpenChange }: PayDialogProps) {
 	const navigate = useNavigate();
-	const queryClient = useQueryClient();
-
-	const { data: walletBalance, isLoading: walletLoading } = useQuery({
-		queryKey: ["wallet-balance"],
-		queryFn: () => api.dashboard.overview().then((d) => d.wallet.balance),
-		enabled: open,
-	});
 
 	// List rows sometimes omit the VA — pull detail when the modal opens so
 	// transfer details are always available for an unpaid order.
@@ -64,23 +58,6 @@ export function DepotPayDialog({ order, open, onOpenChange }: PayDialogProps) {
 	const account: VirtualAccount | null =
 		order.account ?? detail?.account ?? null;
 
-	const canPayFromWallet =
-		walletBalance != null && walletBalance >= order.total;
-	const shortfall =
-		walletBalance != null && walletBalance < order.total
-			? order.total - walletBalance
-			: null;
-
-	const pay = useMutation({
-		mutationFn: () => api.orders.payByRef(order.id),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: ["orders"] });
-			void queryClient.invalidateQueries({ queryKey: ["order", order.id] });
-			void queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
-			onOpenChange(false);
-		},
-	});
-
 	const openDetail = () => {
 		onOpenChange(false);
 		void navigate({
@@ -90,14 +67,7 @@ export function DepotPayDialog({ order, open, onOpenChange }: PayDialogProps) {
 	};
 
 	return (
-		<Dialog
-			open={open}
-			onOpenChange={(next) => {
-				if (pay.isPending) return;
-				onOpenChange(next);
-				if (!next) pay.reset();
-			}}
-		>
+		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>Pay {order.id}</DialogTitle>
@@ -116,14 +86,15 @@ export function DepotPayDialog({ order, open, onOpenChange }: PayDialogProps) {
 					) : account ? (
 						<div>
 							<p className="mb-2 text-[0.65rem] tracking-[0.2em] text-muted-foreground uppercase">
-								Transfer to your Soroman account
+								Transfer to the account for this order
 							</p>
 							<AccountRows account={account} className="border-foreground/15" />
 							<div className="mt-2 flex justify-end">
 								<CopyAllButton account={account} />
 							</div>
 							<p className="mt-2 text-xs text-muted-foreground">
-								Transfer the exact total — payment confirms automatically.
+								Transfer the exact total — Soroman confirms your payment once
+								the transfer lands.
 							</p>
 						</div>
 					) : (
@@ -132,53 +103,12 @@ export function DepotPayDialog({ order, open, onOpenChange }: PayDialogProps) {
 							again in a moment.
 						</p>
 					)}
-
-					{/* Wallet: pay button when covered, shortfall callout when not. */}
-					{walletLoading ? (
-						<Skeleton className="h-16 rounded-lg" />
-					) : canPayFromWallet ? (
-						<div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
-							<p className="text-xs text-muted-foreground">
-								Wallet balance {formatNaira(walletBalance ?? 0)} — covers this
-								order.
-							</p>
-							<Button
-								className="mt-3 w-full cursor-pointer"
-								disabled={pay.isPending}
-								onClick={() => pay.mutate()}
-							>
-								{pay.isPending
-									? "Paying…"
-									: `Pay ${formatNaira(order.total)} from wallet`}
-							</Button>
-						</div>
-					) : walletBalance != null ? (
-						<div className="rounded-lg border border-amber-500/35 bg-amber-500/8 px-4 py-3">
-							<p className="text-xs font-medium text-amber-900">
-								Wallet balance {formatNaira(walletBalance)} — short by{" "}
-								{formatNaira(shortfall ?? 0)}.
-							</p>
-							<p className="mt-1 text-xs text-amber-900/75">
-								Transfer the full {formatNaira(order.total)} to the account
-								above, or top up your wallet first.
-							</p>
-						</div>
-					) : null}
-
-					{pay.isError && (
-						<p className="text-xs text-destructive">
-							{pay.error instanceof ApiError
-								? pay.error.message
-								: "Could not pay from wallet."}
-						</p>
-					)}
 				</div>
 
 				<DialogFooter>
 					<Button
 						variant="outline"
 						className="cursor-pointer"
-						disabled={pay.isPending}
 						onClick={() => onOpenChange(false)}
 					>
 						Close

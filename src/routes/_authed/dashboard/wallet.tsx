@@ -167,8 +167,8 @@ function WalletPage() {
 						</p>
 					)}
 					<p className="mt-2 text-xs text-muted-foreground">
-						Pays depot and cooking-gas orders instantly when it covers
-						the total.
+						Deposits recorded by Soroman. Orders are paid by bank transfer and
+						confirmed by our desk against your payment.
 					</p>
 				</section>
 

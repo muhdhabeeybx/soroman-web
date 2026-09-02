@@ -20,7 +20,6 @@ import { OrderDetailSkeleton } from "@/components/orders/order-detail-skeleton";
 import { Button } from "@/components/ui/button";
 import { env } from "@/env";
 import { usePageVisible } from "@/hooks/use-page-visible";
-import { api } from "@/lib/api";
 import { WHATSAPP_URL } from "@/lib/company";
 import { getMyLpgOrder, type LpgOrderRequest } from "@/lib/cooking-gas/api";
 import { requestOrderLiveMs, visibleRefetch } from "@/lib/live-refetch";
@@ -118,26 +117,6 @@ function RequestDetail({ request }: { request: LpgOrderRequest }) {
 		request.status === "Rejected" || request.status === "Cancelled";
 	const total =
 		request.totalAmount != null ? Number(request.totalAmount) : null;
-
-	const { data: walletBalance } = useQuery({
-		queryKey: ["wallet-balance"],
-		queryFn: () => api.dashboard.overview().then((d) => d.wallet.balance),
-		enabled: quoteReady,
-	});
-
-	const shortfall =
-		quoteReady &&
-		total != null &&
-		walletBalance != null &&
-		walletBalance < total
-			? total - walletBalance
-			: null;
-	const canCoverFromWallet =
-		quoteReady &&
-		total != null &&
-		total > 0 &&
-		walletBalance != null &&
-		walletBalance >= total;
 
 	const copyRef = async () => {
 		try {
@@ -249,17 +228,6 @@ function RequestDetail({ request }: { request: LpgOrderRequest }) {
 									</div>
 								</dl>
 
-								{walletBalance != null && !canCoverFromWallet && (
-									<div className="rounded-lg border border-amber-500/35 bg-amber-500/8 px-4 py-3">
-										<p className="text-xs font-medium text-amber-900">
-											Wallet balance {formatNaira(walletBalance)} — short by{" "}
-											{formatNaira(shortfall ?? 0)}.
-										</p>
-										<p className="mt-1 text-xs text-amber-900/75">
-											Transfer the full {formatNaira(total)}, or top up first.
-										</p>
-									</div>
-								)}
 
 								<div>
 									<p className={cn(MICRO, "text-muted-foreground")}>
@@ -364,12 +332,6 @@ function RequestDetail({ request }: { request: LpgOrderRequest }) {
 				<DetailRail>
 					<DetailRailCard title="Actions">
 						<div className="space-y-1">
-							{quoteReady && walletBalance != null && !canCoverFromWallet && (
-								<p className="mb-2 px-1 text-xs text-muted-foreground">
-									Wallet {formatNaira(walletBalance)} — pay the rest by transfer
-									(details on the left).
-								</p>
-							)}
 							<RailAction onClick={() => void copyRef()}>
 								<Copy />
 								Copy reference

@@ -7,7 +7,6 @@ import {
 	MessageCircle,
 	RotateCcw,
 	Truck,
-	Wallet,
 	XCircle,
 } from "lucide-react";
 import { useState } from "react";
@@ -160,32 +159,11 @@ function OrderDetailView({ order }: { order: OrderDetail }) {
 		order.status === "released" ||
 		order.status === "loading";
 
-	const { data: walletBalance } = useQuery({
-		queryKey: ["wallet-balance"],
-		queryFn: () => api.dashboard.overview().then((d) => d.wallet.balance),
-		enabled: unpaid,
-	});
-	const canPayFromWallet =
-		unpaid && walletBalance != null && walletBalance >= order.total;
-	const shortfall =
-		unpaid && walletBalance != null && walletBalance < order.total
-			? order.total - walletBalance
-			: null;
-
 	const invalidateLists = () => {
 		void queryClient.invalidateQueries({ queryKey: ["orders"] });
 		void queryClient.invalidateQueries({ queryKey: ["wallet-balance"] });
 		void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
 	};
-
-	const payFromWallet = useMutation({
-		mutationFn: () => api.orders.payByRef(order.id),
-		onSuccess: (updated) => {
-			// Seed cache so polling stops/slows immediately from the new status.
-			queryClient.setQueryData(["order", order.id], updated);
-			invalidateLists();
-		},
-	});
 
 	const cancel = useMutation({
 		mutationFn: () => api.orders.cancelByRef(order.id),
@@ -266,19 +244,6 @@ function OrderDetailView({ order }: { order: OrderDetail }) {
 								</span>
 							</div>
 							<div className="space-y-4 px-5 py-5">
-								{walletBalance != null && !canPayFromWallet && (
-									<div className="rounded-lg border border-amber-500/35 bg-amber-500/8 px-4 py-3">
-										<p className="text-xs font-medium text-amber-900">
-											Wallet balance {formatNaira(walletBalance)} — short by{" "}
-											{formatNaira(shortfall ?? 0)}.
-										</p>
-										<p className="mt-1 text-xs text-amber-900/75">
-											Transfer the full {formatNaira(order.total)} below, or top
-											up your wallet first.
-										</p>
-									</div>
-								)}
-
 								{order.account ? (
 									<div>
 										<div className="flex items-center justify-between gap-3">
@@ -408,33 +373,6 @@ function OrderDetailView({ order }: { order: OrderDetail }) {
 				<DetailRail>
 					<DetailRailCard title="Actions">
 						<div className="space-y-1">
-							{canPayFromWallet && (
-								<>
-									<Button
-										className="mb-1 w-full cursor-pointer"
-										disabled={payFromWallet.isPending}
-										onClick={() => payFromWallet.mutate()}
-									>
-										<Wallet data-icon="inline-start" />
-										{payFromWallet.isPending
-											? "Paying…"
-											: `Pay ${formatNaira(order.total)} from wallet`}
-									</Button>
-									{payFromWallet.isError && (
-										<p className="mb-2 px-1 text-xs text-destructive">
-											{payFromWallet.error instanceof ApiError
-												? payFromWallet.error.message
-												: "Could not pay from wallet."}
-										</p>
-									)}
-								</>
-							)}
-							{unpaid && !canPayFromWallet && walletBalance != null && (
-								<p className="mb-2 px-1 text-xs text-muted-foreground">
-									Wallet {formatNaira(walletBalance)} — use the transfer account
-									on the left.
-								</p>
-							)}
 							{canEditTrucks && (
 								<RailAction onClick={() => setTrucksOpen(true)}>
 									<Truck />
