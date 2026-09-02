@@ -81,7 +81,7 @@ function CleanState() {
 					Nothing in motion. Ready when you are.
 				</p>
 				<p className="mt-1.5 text-sm text-muted-foreground">
-					Order at today's depot price and pay by transfer or from your wallet.
+					Order at today's depot price and pay by bank transfer.
 				</p>
 			</div>
 			<Button size="lg" nativeButton={false} render={<Link to="/order" />}>

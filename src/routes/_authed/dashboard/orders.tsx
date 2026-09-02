@@ -311,7 +311,7 @@ function OrdersPage() {
 						<em className="font-semibold text-accent not-italic">orders</em>.
 					</h1>
 					<p className="mt-2.5 max-w-xl text-sm leading-relaxed text-muted-foreground md:text-base">
-						Fuel at today&apos;s prices — order, pay by transfer or wallet,
+						Fuel at today&apos;s prices — order, pay by transfer,
 						track to the gate.
 					</p>
 				</div>
@@ -442,7 +442,7 @@ function OrdersPage() {
 					}
 					emptyDescription={
 						filter === "all" && (!data || data.pagination.total === 0)
-							? "Order at today's depot price and pay by transfer or from your wallet — progress lives here."
+							? "Order at today's depot price and pay by bank transfer — progress lives here."
 							: undefined
 					}
 					emptyAction={

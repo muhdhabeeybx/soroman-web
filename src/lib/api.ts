@@ -1260,16 +1260,6 @@ export const api = {
 			return mapDetailOrder(data.order);
 		},
 
-		/** Pay an existing unpaid order from wallet balance, by its reference. */
-		payByRef: async (ref: string): Promise<OrderDetail> => {
-			const normalized = ref.trim().toUpperCase();
-			const data = await request<{ order: ServerDetailOrder }>(
-				`/api/customer/orders/by-ref/${encodeURIComponent(normalized)}/pay`,
-				{ method: "POST", csrf: true },
-			);
-			return mapDetailOrder(data.order);
-		},
-
 		/**
 		 * Cancel an unpaid pending order by its order number. Releases reserved
 		 * stock; refuses once Paid or further along (409).
@@ -1381,23 +1371,6 @@ export const api = {
 				};
 			}
 			throw new ApiError(404, "No pending order to pay.");
-		},
-
-		/**
-		 * Pay every just-placed order from the customer's wallet balance — the
-		 * invoice screen's "Pay from wallet" action, offered when the balance covers
-		 * the total. Each order flips to Paid synchronously (no transfer, no
-		 * polling). The first order the wallet can't cover throws ApiError, so a
-		 * shortfall surfaces rather than paying part of the bill silently.
-		 */
-		payFromWallet: async (): Promise<void> => {
-			const placement = lastPlacement;
-			if (!placement) throw new ApiError(400, "No order to pay for.");
-			for (const orderId of placement.orderIds) {
-				await request<unknown>(`/api/customer/orders/${orderId}/pay`, {
-					method: "POST",
-				});
-			}
 		},
 
 		/**

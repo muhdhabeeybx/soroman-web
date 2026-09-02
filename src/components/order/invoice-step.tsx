@@ -23,10 +23,6 @@ export default function InvoiceStep({
 	const [account, setAccount] = useState<VirtualAccount | null>(null);
 	const [credits, setCredits] = useState<PaymentCredit[]>([]);
 	const [now, setNow] = useState(() => Date.now());
-	const [walletBalance, setWalletBalance] = useState<number | null>(null);
-	const [payingFromWallet, setPayingFromWallet] = useState(false);
-	const [walletPaid, setWalletPaid] = useState(false);
-	const [walletError, setWalletError] = useState<string | null>(null);
 
 	const paid = credits.reduce((sum, c) => sum + c.amount, 0);
 	const remaining = Math.max(0, order.total - paid);
@@ -37,14 +33,6 @@ export default function InvoiceStep({
 	const msLeft =
 		deadlineMs == null ? Number.POSITIVE_INFINITY : Math.max(0, deadlineMs - now);
 	const expired = deadlineMs != null && msLeft === 0 && !fullyPaid;
-	// Instant payment is offered only while today's price still holds and the wallet
-	// actually covers the whole bill; otherwise the customer transfers instead.
-	const canPayFromWallet =
-		!fullyPaid &&
-		!expired &&
-		walletBalance !== null &&
-		walletBalance >= order.total;
-
 	useEffect(() => {
 		if (fullyPaid) return;
 		const t = setInterval(() => setNow(Date.now()), 1000);
@@ -61,50 +49,15 @@ export default function InvoiceStep({
 		};
 	}, []);
 
-	// Wallet balance, to offer instant payment when it covers the total.
-	useEffect(() => {
-		let cancelled = false;
-		void api.dashboard
-			.overview()
-			.then((d) => {
-				if (!cancelled) setWalletBalance(d.wallet.balance);
-			})
-			.catch(() => {});
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-
 	// Poll for transfer confirmation once the account exists.
-	// Stops once paid from wallet so it can't double-count the same order.
 	useEffect(() => {
-		if (!account || walletPaid) return;
+		if (!account) return;
 		return api.payments.watchCredits(order.total, (credit) =>
 			setCredits((prev) =>
 				prev.some((c) => c.id === credit.id) ? prev : [...prev, credit],
 			),
 		);
-	}, [account, order.total, walletPaid]);
-
-	// Pay the whole bill from wallet balance. On success we record one wallet
-	// credit for the total, which flips the invoice to paid and stops the
-	// transfer watcher. A shortfall or a lapsed order surfaces as an inline error.
-	const payFromWallet = async () => {
-		setPayingFromWallet(true);
-		setWalletError(null);
-		try {
-			await api.payments.payFromWallet();
-			setWalletPaid(true);
-			setCredits([
-				{ id: "wallet", from: "Paid from wallet balance", amount: order.total },
-			]);
-		} catch (e) {
-			setWalletError(
-				e instanceof Error ? e.message : "Could not pay from wallet.",
-			);
-			setPayingFromWallet(false);
-		}
-	};
+	}, [account, order.total]);
 
 	return (
 		<div className="mx-auto max-w-2xl">
@@ -155,39 +108,6 @@ export default function InvoiceStep({
 						</span>
 					</div>
 				</div>
-
-				{canPayFromWallet && (
-					<div className="border-b bg-accent/5 px-5 py-4">
-						<div className="flex flex-wrap items-center justify-between gap-3">
-							<div>
-								<p className="text-[0.65rem] tracking-[0.22em] text-accent uppercase">
-									Pay instantly from wallet
-								</p>
-								<p className="mt-1 text-xs text-muted-foreground">
-									Balance {formatNaira(walletBalance ?? 0)} — enough to cover
-									this order.
-								</p>
-							</div>
-							<Button
-								size="sm"
-								onClick={payFromWallet}
-								disabled={payingFromWallet}
-							>
-								{payingFromWallet
-									? "Paying…"
-									: `Pay ${formatNaira(order.total)} from wallet`}
-							</Button>
-						</div>
-						{walletError && (
-							<p className="mt-2 text-[0.65rem] text-destructive">
-								{walletError}
-							</p>
-						)}
-						<p className="mt-2 text-[0.6rem] leading-relaxed text-muted-foreground/60">
-							Or transfer to the account below instead.
-						</p>
-					</div>
-				)}
 
 				<div className="border-b px-5 py-4">
 					<div className="flex items-center justify-between gap-4">
