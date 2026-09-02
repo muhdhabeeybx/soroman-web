@@ -121,8 +121,8 @@ export function AppSidebar() {
 							<img
 								src="/logo-full.png"
 								alt="Soroman"
-								width={770}
-								height={136}
+								width={720}
+								height={131}
 								className="h-5 w-auto group-data-[collapsible=icon]:hidden dark:hue-rotate-180 dark:invert"
 							/>
 						</SidebarMenuButton>

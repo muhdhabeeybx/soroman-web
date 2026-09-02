@@ -129,16 +129,21 @@ export default function Header() {
 						className="flex shrink-0 items-center"
 					>
 						{/*
-						 * The official full logo. Its wordmark is near-black (#272827), so
-						 * on the charcoal dark ground it would sit at ~1.1:1 and vanish.
-						 * invert+hue-rotate flips lightness while keeping hue: the wordmark
-						 * lands at #d7d8d7 (12.2:1) and the mark stays green (#32a97a).
+						 * The official full logo — mark plus wordmark only. The bilingual
+						 * lockup (with 索罗曼) is /logo-lockup.png and needs roughly three
+						 * times this height before the characters are legible, so it is not
+						 * usable in a 56px header bar.
+						 *
+						 * The wordmark is near-black (#222323), so on the charcoal dark
+						 * ground it would sit at 1.08:1 and vanish. invert+hue-rotate flips
+						 * lightness while keeping hue: the wordmark lands at #dddcdc
+						 * (12.5:1) and the mark stays green.
 						 */}
 						<img
 							src="/logo-full.png"
 							alt=""
-							width={770}
-							height={136}
+							width={720}
+							height={131}
 							className="h-5 w-auto md:h-6 dark:hue-rotate-180 dark:invert"
 						/>
 					</Link>
