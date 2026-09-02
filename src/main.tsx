@@ -77,11 +77,11 @@ if (!rootElement) {
 	throw new Error("Root element not found");
 }
 
-// Always mount. Prerender writes real markup into `#app` for crawlers / first
-// paint; createRoot replaces it on the client so interactivity still boots.
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-	<QueryClientProvider client={queryClient}>
-		<RouterProvider router={router} />
-	</QueryClientProvider>,
-);
+if (!rootElement.innerHTML) {
+	const root = ReactDOM.createRoot(rootElement);
+	root.render(
+		<QueryClientProvider client={queryClient}>
+			<RouterProvider router={router} />
+		</QueryClientProvider>,
+	);
+}
