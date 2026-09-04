@@ -42,7 +42,7 @@ import {
 	scheduleOrderDraftClearOnLeave,
 	writeOrderDraft,
 } from "@/lib/order-draft";
-import { formatNaira, useCatalog } from "@/lib/use-catalog";
+import { formatNaira, hasPublishedPrice, useCatalog } from "@/lib/use-catalog";
 import { useSettings } from "@/lib/use-settings";
 
 /** The depot wizard's steps (payment stands alone after the order is created). */
@@ -241,7 +241,10 @@ function OrderPage() {
 	const lines = useMemo<OrderLine[]>(
 		() =>
 			depotProducts
-				.filter((p) => p.available && (quantities[p.id] ?? 0) > 0)
+				.filter(
+					(p) =>
+						p.available && hasPublishedPrice(p) && (quantities[p.id] ?? 0) > 0,
+				)
 				.map((p) => ({
 					product_id: p.id,
 					abbreviation: p.abbreviation,
@@ -253,6 +256,14 @@ function OrderPage() {
 		[depotProducts, quantities],
 	);
 	const total = lines.reduce((sum, l) => sum + l.unit_price * l.quantity, 0);
+	/**
+	 * Every product at this depot is out of stock or unpriced, so no quantity
+	 * will ever unlock Continue. Say why rather than leaving the default
+	 * "add a quantity" hint pointing at a control that cannot help.
+	 */
+	const noPricesHere =
+		depotProducts.length > 0 &&
+		!depotProducts.some((p) => p.available && hasPublishedPrice(p));
 
 	// The order names a company on its ticket/invoice, so it's required — asked on
 	// the first step (depot & product), matching the backend's required companyName.
@@ -319,8 +330,9 @@ function OrderPage() {
 			? {
 					label: "Continue",
 					disabled: !orderComplete,
-					hint:
-						total === 0
+					hint: noPricesHere
+						? "No prices set for this depot today — pick another depot, or call the desk."
+						: total === 0
 							? "Add a quantity to continue"
 							: "Enter the company this order is for",
 					onClick: () => setStep("loading"),

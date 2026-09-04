@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { paymentWindowHoursLabel } from "@/lib/api";
-import { formatNaira, useCatalog } from "@/lib/use-catalog";
+import { formatNaira, hasPublishedPrice, useCatalog } from "@/lib/use-catalog";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,7 +41,8 @@ const REST_TURNS = 6;
 const PANEL_CLOSE_GRACE_MS = 200;
 
 export default function Hero() {
-	const { depots, products, updatedAt, isLoading, orderExpiryHours } = useCatalog();
+	const { depots, products, updatedAt, isLoading, orderExpiryHours } =
+		useCatalog();
 
 	const openDepots = useMemo(() => depots.filter((d) => d.is_open), [depots]);
 
@@ -55,9 +56,14 @@ export default function Hero() {
 		const built = [...byAbbr.entries()].map(([abbr, meta]) => {
 			const quotes = openDepots
 				.flatMap((d) => {
+					// A zero price is not a quote — the depot simply has not published
+					// one today, so it falls through to nonQuoting below.
 					const p = products.find(
 						(x) =>
-							x.depot_id === d.id && x.abbreviation === abbr && x.available,
+							x.depot_id === d.id &&
+							x.abbreviation === abbr &&
+							x.available &&
+							hasPublishedPrice(x),
 					);
 					return p
 						? [
@@ -166,10 +172,7 @@ function MarketSnapshotSkeleton() {
 					Market snapshot
 				</span>
 				<span className="flex items-center gap-2 text-xs tracking-[0.2em] text-muted-foreground uppercase">
-					<span
-						className="size-1.5 rounded-full bg-muted"
-						aria-hidden
-					/>
+					<span className="size-1.5 rounded-full bg-muted" aria-hidden />
 					Live
 				</span>
 			</div>
@@ -219,6 +222,13 @@ function MarketSnapshot({
 	const [panelKey, setPanelKey] = useState<string | null>(null);
 	const [panelFading, setPanelFading] = useState(false);
 	const paymentWindowLabel = paymentWindowHoursLabel(orderExpiryHours);
+	/**
+	 * Not one depot has published a price for any product. Promising a price
+	 * window under that would be promising a price we do not have, so the
+	 * status line states the actual situation instead.
+	 */
+	const nonePriced =
+		rows.length > 0 && rows.every((r) => r.quotes.length === 0);
 
 	const pausedRef = useRef(false);
 	const turnRef = useRef(0);
@@ -377,7 +387,11 @@ function MarketSnapshot({
 							})}
 						</>
 					)}
-					{paymentWindowLabel ? ` · ${paymentWindowLabel}` : ""}
+					{nonePriced
+						? " · Prices not set across all locations"
+						: paymentWindowLabel
+							? ` · ${paymentWindowLabel}`
+							: ""}
 				</p>
 				<div
 					className="ease-luxe grid transition-[grid-template-rows] duration-[280ms]"
@@ -440,19 +454,21 @@ function SnapshotRow({
 				</p>
 				<div className={fadeClass}>
 					<p className="mt-1.5 truncate text-sm text-muted-foreground">
-						{shownQuote && (
+						{/*
+						 * Exactly one of these. Touring the depots that are not quoting
+						 * only makes sense while at least one IS: with nothing priced
+						 * anywhere, the tour and the "nobody has published" line used to
+						 * render together and ran into each other.
+						 */}
+						{shownQuote ? (
 							<>
 								{shownQuote.depotName}, {shownQuote.state}
 							</>
-						)}
-						{shownNonQuoting && (
+						) : (
 							<span className="text-muted-foreground/60">
-								{shownNonQuoting.depotName}
-							</span>
-						)}
-						{!best && (
-							<span className="text-muted-foreground/60">
-								No depot has published yet
+								{best && shownNonQuoting
+									? shownNonQuoting.depotName
+									: "No depot has published a price yet"}
 							</span>
 						)}
 					</p>

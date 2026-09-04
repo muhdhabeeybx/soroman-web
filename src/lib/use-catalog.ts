@@ -44,6 +44,17 @@ export function useCatalog(): CatalogState {
 	return state;
 }
 
+/**
+ * Whether the desk has actually published a price for this product.
+ *
+ * A depot row can carry a zero because no price has been set for the day yet
+ * — that is NOT the same as the product being out of stock, and it is not a
+ * genuine "₦0/litre" quote either. Every surface routes an unpriced product
+ * to "price not set" copy rather than printing the zero or claiming no stock.
+ */
+export const hasPublishedPrice = (p: { price: number }): boolean =>
+	Number.isFinite(p.price) && p.price > 0;
+
 export const formatNaira = (amount: number) =>
 	`₦${amount.toLocaleString("en-NG")}`;
 

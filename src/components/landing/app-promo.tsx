@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
 	canonicalProduct,
 	formatNaira,
+	hasPublishedPrice,
 	PRODUCT_ORDER,
 	useCatalog,
 } from "@/lib/use-catalog";
@@ -36,7 +37,10 @@ export default function AppPromo() {
 		);
 		const best = new Map<string, BestQuote>();
 		for (const p of products) {
-			if (!p.available || !openDepots.has(p.depot_id)) continue;
+			// Unpriced rows never enter the mock — a zero would read as the day's
+			// best price and undercut every real quote.
+			if (!p.available || !hasPublishedPrice(p) || !openDepots.has(p.depot_id))
+				continue;
 			// Keyed by canonical fuel, like the board: two depots calling petrol
 			// "Petrol" and "PMS" are one product, not two rows in the mock.
 			const key = canonicalProduct(p).key;
@@ -117,33 +121,39 @@ export default function AppPromo() {
 											Today's Lowest Price
 										</p>
 										<ul className="mt-1 divide-y divide-foreground/10">
-											{isLoading
-												? Array.from({ length: 4 }, (_, i) => (
-														<li key={i} className="py-3">
-															<Skeleton className="h-4 w-full" />
-														</li>
-													))
-												: rows.map((row) => (
-														<li
-															key={row.abbr}
-															className="flex items-baseline justify-between gap-3 py-2.5"
-														>
-															<span className="min-w-0">
-																<span className="text-sm font-semibold">
-																	{row.abbr}
-																</span>
-																<span className="mt-0.5 block truncate text-[0.65rem] text-muted-foreground">
-																	{row.depot}
-																</span>
+											{isLoading ? (
+												Array.from({ length: 4 }, (_, i) => (
+													<li key={i} className="py-3">
+														<Skeleton className="h-4 w-full" />
+													</li>
+												))
+											) : rows.length === 0 ? (
+												<li className="py-3 text-[0.65rem] text-muted-foreground">
+													Prices not set across all locations yet.
+												</li>
+											) : (
+												rows.map((row) => (
+													<li
+														key={row.abbr}
+														className="flex items-baseline justify-between gap-3 py-2.5"
+													>
+														<span className="min-w-0">
+															<span className="text-sm font-semibold">
+																{row.abbr}
 															</span>
-															<span className="text-sm font-semibold whitespace-nowrap tabular-nums">
-																{formatNaira(row.price)}
-																<span className="ml-0.5 text-[0.65rem] font-normal text-muted-foreground">
-																	/{row.unit}
-																</span>
+															<span className="mt-0.5 block truncate text-[0.65rem] text-muted-foreground">
+																{row.depot}
 															</span>
-														</li>
-													))}
+														</span>
+														<span className="text-sm font-semibold whitespace-nowrap tabular-nums">
+															{formatNaira(row.price)}
+															<span className="ml-0.5 text-[0.65rem] font-normal text-muted-foreground">
+																/{row.unit}
+															</span>
+														</span>
+													</li>
+												))
+											)}
 										</ul>
 
 										<div className="mt-4 rounded-xl border border-foreground/10 bg-muted/50 px-3.5 py-2.5">

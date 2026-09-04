@@ -3,7 +3,7 @@ import { BoxedInput, BoxedSelect } from "@/components/order/boxed";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { NativeSelectOption } from "@/components/ui/native-select";
 import type { Depot, DepotProduct } from "@/lib/api";
-import { formatNaira } from "@/lib/use-catalog";
+import { formatNaira, hasPublishedPrice } from "@/lib/use-catalog";
 import { cn } from "@/lib/utils";
 
 /** Short trade code for the badge — never wrap a full product name into size-9. */
@@ -14,6 +14,15 @@ function productBadge(product: DepotProduct): string {
 	const code = raw.split(/[\s(/]/)[0]?.trim() ?? raw;
 	if (code.length > 0 && code.length <= 5) return code.toUpperCase();
 	return code.slice(0, 4).toUpperCase();
+}
+
+/**
+ * Orderable = in stock AND carrying a real price. A product the desk has not
+ * priced today would otherwise be selectable at ₦0 and place a zero-value
+ * order, so it is offered as "price not set" and left disabled.
+ */
+function isOrderable(product: DepotProduct): boolean {
+	return product.available && hasPublishedPrice(product);
 }
 
 /**
@@ -55,7 +64,7 @@ export default function OrderStep({
 	const [picked, setPicked] = useState<number | null>(null);
 	const selectedId =
 		activeId ??
-		(picked != null && products.some((p) => p.id === picked && p.available)
+		(picked != null && products.some((p) => p.id === picked && isOrderable(p))
 			? picked
 			: null);
 	const selected = products.find((p) => p.id === selectedId) ?? null;
@@ -105,20 +114,21 @@ export default function OrderStep({
 				{products.map((product) => {
 					const isSelected = selectedId === product.id;
 					const badge = productBadge(product);
+					const orderable = isOrderable(product);
 					return (
 						<li key={product.id} className="min-w-0">
 							<button
 								type="button"
 								role="radio"
 								aria-checked={isSelected}
-								disabled={!product.available}
-								onClick={() => product.available && select(product.id)}
+								disabled={!orderable}
+								onClick={() => orderable && select(product.id)}
 								className={cn(
 									"ease-luxe flex h-full w-full flex-col gap-2 rounded-lg border p-3 text-left transition-colors duration-250 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none",
 									isSelected
 										? "border-accent/50 bg-accent/5"
 										: "border-input hover:border-foreground/30",
-									!product.available && "cursor-not-allowed opacity-55",
+									!orderable && "cursor-not-allowed opacity-55",
 								)}
 							>
 								<div className="flex items-start justify-between gap-2">
@@ -152,17 +162,21 @@ export default function OrderStep({
 										{product.name}
 									</span>
 									<span className="mt-1 block text-xs text-muted-foreground tabular-nums">
-										{product.available ? (
+										{!product.available ? (
+											<span className="text-muted-foreground/60">
+												Out of stock today
+											</span>
+										) : !hasPublishedPrice(product) ? (
+											<span className="text-muted-foreground/60">
+												Price not set today
+											</span>
+										) : (
 											<>
 												{formatNaira(product.price)}
 												<span className="text-muted-foreground/60">
 													/{product.unit}
 												</span>
 											</>
-										) : (
-											<span className="text-muted-foreground/60">
-												Out of stock today
-											</span>
 										)}
 									</span>
 								</span>
@@ -172,7 +186,7 @@ export default function OrderStep({
 				})}
 			</ul>
 
-			{selected?.available && (
+			{selected && isOrderable(selected) && (
 				<div className="mt-3 rounded-lg border border-accent/30 bg-accent/5 p-3.5">
 					<label
 						htmlFor={`qty-${selected.id}`}

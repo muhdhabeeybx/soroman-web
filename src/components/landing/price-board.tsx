@@ -16,6 +16,7 @@ import { type AppColumnDef, appTableFeatures } from "@/lib/table";
 import {
 	canonicalProduct,
 	formatNaira,
+	hasPublishedPrice,
 	PRODUCT_ORDER,
 	useCatalog,
 } from "@/lib/use-catalog";
@@ -108,7 +109,9 @@ export default function PriceBoard({
 		const openIds = new Set(depots.filter((d) => d.is_open).map((d) => d.id));
 		const best = new Map<string, number>();
 		for (const p of products) {
-			if (!p.available || !openIds.has(p.depot_id)) continue;
+			// An unpriced row would otherwise win every column with its zero.
+			if (!p.available || !hasPublishedPrice(p) || !openIds.has(p.depot_id))
+				continue;
 			const key = canonicalProduct(p).key;
 			const current = best.get(key);
 			if (current === undefined || p.price < current) {
@@ -165,6 +168,7 @@ export default function PriceBoard({
 					const best =
 						row.original.depot.is_open &&
 						product?.available === true &&
+						hasPublishedPrice(product) &&
 						row.original.bestPrices.get(c.abbr) === product.price;
 					return <PriceCell product={product} best={Boolean(best)} />;
 				},
@@ -208,7 +212,19 @@ export default function PriceBoard({
 		columns,
 	});
 
-	const updatedLine = updatedAt ? (
+	/**
+	 * Nothing anywhere carries a price. The board still lists every depot —
+	 * they are open and loading — but "live prices from all depots" would be a
+	 * lie, so the line says plainly that the day's prices are not set yet.
+	 */
+	const nonePriced =
+		products.length > 0 && !products.some((p) => hasPublishedPrice(p));
+
+	const updatedLine = !updatedAt ? (
+		"Fetching live prices..."
+	) : nonePriced ? (
+		"Prices not set across all locations. Call the desk for today's rate."
+	) : (
 		<>
 			Last updated at{" "}
 			{updatedAt.toLocaleTimeString("en-NG", {
@@ -217,8 +233,6 @@ export default function PriceBoard({
 			})}
 			. Live prices from all Soroman depots.
 		</>
-	) : (
-		"Fetching live prices..."
 	);
 
 	return (
@@ -470,6 +484,11 @@ function PriceCell({
 	if (!product.available) {
 		return <span className="text-xs text-muted-foreground">Out of stock</span>;
 	}
+	// A zero means no price has been set for the day — say that, rather than
+	// printing "₦0" or borrowing the out-of-stock label.
+	if (!hasPublishedPrice(product)) {
+		return <span className="text-xs text-muted-foreground">Price not set</span>;
+	}
 	return (
 		<span
 			className={cn(
@@ -519,20 +538,15 @@ function DepotCard({
 						<span className="text-sm font-medium">
 							{canonicalProduct(product).name}
 						</span>
-						{product.available ? (
-							<PriceCell
-								product={product}
-								best={
-									depot.is_open &&
-									bestPrices.get(canonicalProduct(product).key) ===
-										product.price
-								}
-							/>
-						) : (
-							<span className="text-xs text-muted-foreground">
-								Out of stock
-							</span>
-						)}
+						<PriceCell
+							product={product}
+							best={
+								depot.is_open &&
+								product.available &&
+								hasPublishedPrice(product) &&
+								bestPrices.get(canonicalProduct(product).key) === product.price
+							}
+						/>
 					</li>
 				))}
 			</ul>
