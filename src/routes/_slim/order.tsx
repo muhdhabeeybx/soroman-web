@@ -83,7 +83,7 @@ function ChooseProductPage() {
 				<BackControl authed={auth.status === "authed"} />
 			</aside>
 
-			<main className="min-w-0">
+			<div className="min-w-0">
 				{/* Session row: who's here, and the one action that fits. */}
 				<div className="mb-7 flex min-h-11 flex-wrap items-center gap-3">
 					<BackControl
@@ -196,7 +196,7 @@ function ChooseProductPage() {
 						comingSoon={!env.VITE_COOKING_GAS_ENABLED}
 					/>
 				</div>
-			</main>
+			</div>
 		</div>
 	);
 }

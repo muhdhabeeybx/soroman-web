@@ -27,6 +27,14 @@ export const PLAY_STORE_URL =
 	env.VITE_PLAY_STORE_URL ??
 	"https://play.google.com/store/apps/details?id=ng.soroman.app";
 
+/**
+ * The staff/admin dashboard. A separate app on its own subdomain, so it is a
+ * plain external link opened in a new tab rather than a route — the customer
+ * site should never navigate away from itself into it.
+ */
+export const STAFF_DASHBOARD_URL =
+	env.VITE_STAFF_DASHBOARD_URL ?? "https://dashboard.ordersoroman.com";
+
 export const COMPANY_NAME = "Soroman Energy";
 
 /** The head-office / main-depot street address shown on the contact page. */

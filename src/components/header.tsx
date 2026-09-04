@@ -15,6 +15,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPhoneForDisplay } from "@/lib/api";
 import { authStore, useAuth } from "@/lib/auth";
+import { STAFF_DASHBOARD_URL } from "@/lib/company";
 import { cn } from "@/lib/utils";
 
 // `hash` is declared on every entry so the array stays a uniform union that
@@ -43,6 +44,9 @@ export default function Header() {
 	const mobileNavRef = useRef<HTMLElement>(null);
 	const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+	// The header now rides the checkout surfaces too (see routes/_slim.tsx).
+	// "Start an order" there would point at the task you are already doing.
+	const inOrderFlow = pathname === "/order" || pathname.startsWith("/order/");
 	const isAuthed = auth.status === "authed";
 	const isGuest = auth.status === "guest";
 	const isAuthLoading = auth.status === "loading";
@@ -270,14 +274,12 @@ export default function Header() {
 							/>
 						)}
 
-						{!heroCtaOnScreen && (
+						{!heroCtaOnScreen && !inOrderFlow && (
 							<Button
 								size="sm"
 								nativeButton={false}
 								className="hidden md:inline-flex"
-								render={
-									<Link to="/order">Start an order</Link>
-								}
+								render={<Link to="/order">Start an order</Link>}
 							/>
 						)}
 
@@ -341,15 +343,28 @@ export default function Header() {
 									</Link>
 								</>
 							)}
+							{/* Separate app, separate tab — the customer's place on this
+                  page survives the trip. */}
+							<a
+								href={STAFF_DASHBOARD_URL}
+								target="_blank"
+								rel="noreferrer"
+								onClick={() => setMenuOpen(false)}
+								className="block border-b border-border py-4 text-base text-muted-foreground"
+							>
+								Staff login
+							</a>
 							<div className="flex flex-col gap-3 py-4">
-								<Button
-									nativeButton={false}
-									render={
-										<Link to="/order" onClick={() => setMenuOpen(false)}>
-											Start an order
-										</Link>
-									}
-								/>
+								{!inOrderFlow && (
+									<Button
+										nativeButton={false}
+										render={
+											<Link to="/order" onClick={() => setMenuOpen(false)}>
+												Start an order
+											</Link>
+										}
+									/>
+								)}
 								{isGuest && (
 									<Button
 										variant="secondary"

@@ -28,6 +28,9 @@ export const env = createEnv({
 		VITE_APP_STORE_URL: z.url().optional(),
 		VITE_PLAY_STORE_URL: z.url().optional(),
 		VITE_OFFICE_ADDRESS: z.string().min(5).optional(),
+		// Where the staff/admin dashboard lives. Surfaced as the "Staff
+		// login" link in the header menu and footer, and opened in a new tab.
+		VITE_STAFF_DASHBOARD_URL: z.url().optional(),
 	},
 	runtimeEnv: viteEnv,
 	skipValidation: !!viteEnv.SKIP_ENV_VALIDATION,

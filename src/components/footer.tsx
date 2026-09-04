@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 
 import {
 	COMPANY_NAME,
+	STAFF_DASHBOARD_URL,
 	SUPPORT_PHONE,
 	telHref,
 	WHATSAPP_URL,
@@ -80,6 +81,17 @@ export default function Footer() {
 							>
 								Delete account
 							</Link>
+							{/* The staff dashboard is a separate app on its own subdomain —
+                an external link in a new tab, so a customer mid-task never
+                loses this page. */}
+							<a
+								href={STAFF_DASHBOARD_URL}
+								target="_blank"
+								rel="noreferrer"
+								className="transition-colors duration-500 ease-luxe hover:text-foreground"
+							>
+								Staff login
+							</a>
 						</nav>
 						{/* Appearance is a preference, not a task — it lives here rather
                 than competing with the CTA in the header. */}
