@@ -714,6 +714,20 @@ type CatalogPayload = {
 	orderExpiryHours: number | null;
 };
 
+/**
+ * The price-validity window we PROMISE, in hours.
+ *
+ * The window is the backend's to set (ORDER_EXPIRY_HOURS, echoed by
+ * GET /api/catalog), and the copy normally just repeats whatever it sends.
+ * The API is currently still on 4 while the desk quotes 8, so this pins the
+ * number every surface prints until the backend catches up.
+ *
+ * NOTE: it moves the COPY only. A placed order's `expiresAt` is the server's
+ * own deadline, so the invoice countdown still runs to the backend's window.
+ * Delete this constant (and the override below) once ORDER_EXPIRY_HOURS is 8.
+ */
+const PROMISED_EXPIRY_HOURS = 8;
+
 function fetchCatalogPayload(): Promise<CatalogPayload> {
 	if (catalogCache && Date.now() - catalogCache.at < CATALOG_TTL_MS) {
 		return catalogCache.promise;
@@ -729,8 +743,9 @@ function fetchCatalogPayload(): Promise<CatalogPayload> {
 		if (data.orderExpiryHours === null) {
 			orderExpiryHours = null;
 		} else {
-			const hours = Number(data.orderExpiryHours);
-			orderExpiryHours = Number.isFinite(hours) && hours > 0 ? hours : 24;
+			// A real window is overridden to the promised one; "switched off"
+			// above is left alone, since there is no window to restate.
+			orderExpiryHours = PROMISED_EXPIRY_HOURS;
 		}
 		return { depots: data.depots, orderExpiryHours };
 	});
